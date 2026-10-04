@@ -1,0 +1,75 @@
+name: PixiJS isolated native validation
+
+on:
+  push:
+    branches: [codex/pixijs-native-validation]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pixijs-isolated-native-validation
+  cancel-in-progress: false
+
+env:
+  VALIDATION_PHASE: red
+
+jobs:
+  native:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    outputs:
+      phase: ${{ steps.phase.outputs.phase }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - id: phase
+        shell: bash
+        run: |
+          echo "phase=$VALIDATION_PHASE" >> "$GITHUB_OUTPUT"
+          mkdir -p .native-evidence
+          git rev-parse HEAD | tee .native-evidence/head.txt
+          sha256sum src/dom/*.ts src/dom/__tests__/*.ts > .native-evidence/source-sha256.txt
+      - name: Canonical project setup (Node 24.15.0, npm 11, Electron)
+        uses: ./.github/actions/setup
+      - name: Real Electron DOM lifecycle tests
+        id: dom
+        shell: bash
+        env:
+          NODE_ENV: production
+        run: |
+          xvfb-run --auto-servernum npm run test -- unit --testPathPattern=src/dom/ --maxWorkers=2 2>&1 | tee .native-evidence/dom.log
+      - name: Canonical lint, types, index, prune and DTS checks
+        if: env.VALIDATION_PHASE == 'green'
+        uses: ./.github/actions/lint
+      - name: Canonical complete native unit suite
+        if: always() && env.VALIDATION_PHASE == 'green' && steps.dom.outcome == 'success'
+        uses: ./.github/actions/unit
+        with:
+          type: Unit
+      - name: Canonical distribution build
+        if: success() && env.VALIDATION_PHASE == 'green'
+        run: npm run dist
+      - name: Save immutable native evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-${{ env.VALIDATION_PHASE }}-${{ github.sha }}
+          path: .native-evidence/
+          include-hidden-files: true
+
+  visuals:
+    needs: native
+    if: needs.native.outputs.phase == 'green' && needs.native.result == 'success'
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Canonical macOS visual suite
+        uses: ./.github/actions/unit
+        with:
+          type: Visuals
