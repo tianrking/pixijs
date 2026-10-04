@@ -73,3 +73,32 @@ jobs:
         uses: ./.github/actions/unit
         with:
           type: Visuals
+
+  original-controls:
+    needs: native
+    if: always() && needs.native.outputs.phase == 'red'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 2eeb54e3dc21f1380b9c01c9ca44c1a5bbe154fb
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Original twelve-case source evidence
+        run: |
+          mkdir -p .native-evidence
+          git rev-parse HEAD > .native-evidence/control-head.txt
+          sha256sum src/dom/*.ts src/dom/__tests__/*.ts > .native-evidence/control-source-sha256.txt
+      - name: Individually reported original positive controls
+        shell: bash
+        env:
+          NODE_ENV: production
+        run: |
+          xvfb-run --auto-servernum npm run test -- unit --testPathPattern=src/dom/__tests__/DOMContainer.element.test.ts '--testNamePattern=preserve an externally parented|leave the rendered element and its focus|preserve the previous element' --verbose --maxWorkers=2 2>&1 | tee .native-evidence/controls.log
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: original-control-evidence-${{ github.sha }}
+          path: .native-evidence/
+          include-hidden-files: true
