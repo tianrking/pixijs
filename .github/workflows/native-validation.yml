@@ -46,7 +46,9 @@ jobs:
           git reset --soft HEAD^
           sh .husky/pre-commit 2>&1 | tee .native-evidence/pre-commit.log
           mkdir -p .native-evidence/source-after-hook
-          cp src/dom/DOMContainer.ts src/dom/DOMPipe.ts src/dom/__tests__/DOMContainer.element.test.ts .native-evidence/source-after-hook/
+          cp src/dom/DOMContainer.ts .native-evidence/source-after-hook/DOMContainer.ts.txt
+          cp src/dom/DOMPipe.ts .native-evidence/source-after-hook/DOMPipe.ts.txt
+          cp src/dom/__tests__/DOMContainer.element.test.ts .native-evidence/source-after-hook/DOMContainer.element.test.ts.txt
           test "$(git write-tree)" = "$expected_tree"
           git reset --hard "$formal_head"
           test "$(git rev-parse HEAD)" = "$CODE_REF"
