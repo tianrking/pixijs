@@ -24,7 +24,7 @@ describe('DOMContainer element replacement', () =>
     afterEach(() =>
     {
         container.destroy();
-        app.destroy();
+        app?.destroy();
         host.remove();
     });
 
@@ -166,6 +166,21 @@ describe('DOMContainer element replacement', () =>
         expect(second.parentNode).toBeNull();
         expect(third.parentNode).toBeNull();
         expect(root.children).toHaveLength(0);
+    });
+
+    it('should preserve an unrendered external replacement when the renderer is destroyed', () =>
+    {
+        const first = container.element;
+        const second = document.createElement('input');
+
+        app.renderer.render(app.stage);
+        host.appendChild(second);
+        container.element = second;
+        app.destroy();
+        app = null;
+
+        expect(second.parentNode).toBe(host);
+        expect(first.parentNode).toBeNull();
     });
 
     it('should not leave a rendered element behind when destroyed before the next render', () =>
