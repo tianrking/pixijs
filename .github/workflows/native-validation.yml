@@ -12,7 +12,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  VALIDATION_PHASE: red
+  VALIDATION_PHASE: green
+  CODE_REF: 3bc45908f963e257bc1c8890c18543fe2c036900
 
 jobs:
   native:
@@ -23,6 +24,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ env.VALIDATION_PHASE == 'green' && env.CODE_REF || github.sha }}
+          fetch-depth: 2
           persist-credentials: false
       - id: phase
         shell: bash
@@ -33,6 +36,19 @@ jobs:
           sha256sum src/dom/*.ts src/dom/__tests__/*.ts > .native-evidence/source-sha256.txt
       - name: Canonical project setup (Node 24.15.0, npm 11, Electron)
         uses: ./.github/actions/setup
+      - name: Required pre-commit hook on the exact source diff
+        if: env.VALIDATION_PHASE == 'green'
+        shell: bash
+        run: |
+          formal_head=$(git rev-parse HEAD)
+          expected_tree=$(git rev-parse HEAD^{tree})
+          git reset --soft HEAD^
+          sh .husky/pre-commit 2>&1 | tee .native-evidence/pre-commit.log
+          mkdir -p .native-evidence/source-after-hook
+          cp src/dom/DOMContainer.ts src/dom/DOMPipe.ts src/dom/__tests__/DOMContainer.element.test.ts .native-evidence/source-after-hook/
+          test "$(git write-tree)" = "$expected_tree"
+          git reset --hard "$formal_head"
+          test "$(git rev-parse HEAD)" = "$CODE_REF"
       - name: Real Electron DOM lifecycle tests
         id: dom
         shell: bash
@@ -67,6 +83,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ env.CODE_REF }}
           persist-credentials: false
       - uses: ./.github/actions/setup
       - name: Canonical macOS visual suite
