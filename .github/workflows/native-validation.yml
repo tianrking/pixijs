@@ -40,6 +40,7 @@ jobs:
         if: env.VALIDATION_PHASE == 'green'
         shell: bash
         run: |
+          npx husky install
           formal_head=$(git rev-parse HEAD)
           expected_tree=$(git rev-parse HEAD^{tree})
           git reset --soft HEAD^
